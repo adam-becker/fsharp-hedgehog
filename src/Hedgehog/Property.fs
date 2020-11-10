@@ -339,7 +339,7 @@ module Property =
                   Status = GaveUp }
             else
                 let seed1, seed2 = Seed.split seed
-                let result = Random.run seed1 size random
+                let result = Gen.run seed1 size random
 
                 match snd (Tree.outcome result) with
                 | Failure ->
