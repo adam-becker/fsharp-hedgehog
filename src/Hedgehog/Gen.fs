@@ -13,9 +13,11 @@ module Gen =
     let private unsafeRun seed size (Gen(g)) =
         g seed size
 
+    [<CompiledName("Run")>]
     let run seed size g =
         unsafeRun seed (max 1 size) g
 
+    [<CompiledName("Extract")>]
     let extract seed size g =
         run seed size g
         |> Tree.outcome
@@ -58,6 +60,7 @@ module Gen =
 
             Tree.bind (run seed1 size g) (run seed2 size << k))
 
+    [<CompiledName("Replicate")>]
     let replicate times g =
         let rec loop n xs =
             if n <= 0 then
@@ -487,9 +490,11 @@ module Gen =
     //
 
     let sampleTree (size : Size) (count : int) (g : Gen<'a>) : List<Tree<'a>> =
-        let seed = Seed.random ()
+        let mutable seed = Seed.random ()
         [ for _ in 0 .. count - 1 do
-            run seed size g ]
+            let (seed1, seed2) = Seed.split seed
+            seed <- seed2
+            yield run seed1 size g ]
 
     let sample (size : Size) (count : int) (g : Gen<'a>) : List<'a> =
         sampleTree size count g
