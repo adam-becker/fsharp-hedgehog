@@ -490,11 +490,14 @@ module Gen =
     //
 
     let sampleTree (size : Size) (count : int) (g : Gen<'a>) : List<Tree<'a>> =
-        let mutable seed = Seed.random ()
-        [ for _ in 0 .. count - 1 do
+        let action seed _ =
             let (seed1, seed2) = Seed.split seed
-            seed <- seed2
-            yield run seed1 size g ]
+            (run seed1 size g), seed2
+
+        Seq.init count id
+        |> Seq.mapFold action (Seed.random ())
+        |> fst
+        |> Seq.toList
 
     let sample (size : Size) (count : int) (g : Gen<'a>) : List<'a> =
         sampleTree size count g
