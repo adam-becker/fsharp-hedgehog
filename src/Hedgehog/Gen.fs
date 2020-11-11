@@ -16,17 +16,21 @@ module Gen =
     let run seed size g =
         unsafeRun seed (max 1 size) g
 
+    let extract seed size g =
+        run seed size g
+        |> Tree.outcome
+
     [<CompiledName("Delay")>]
     let delay f =
         Gen (fun seed size -> unsafeRun seed size (f()))
 
     [<CompiledName("TryFinally")>]
-    let tryFinally g after : Gen<'a> = Gen(fun seed size ->
-        try
-            unsafeRun seed size g
-        finally
-            after ()
-    )
+    let tryFinally g after : Gen<'a> =
+        Gen(fun seed size ->
+            try
+                unsafeRun seed size g
+            finally
+                after ())
 
     [<CompiledName("TryWith")>]
     let tryWith (g : Gen<'a>) (k : exn -> Gen<'a>) : Gen<'a> =
@@ -34,26 +38,25 @@ module Gen =
             try
                 unsafeRun seed size g
             with
-                x -> unsafeRun seed size (k x)
-        )
+                x -> unsafeRun seed size (k x))
 
     [<CompiledName("Create")>]
-    let create shrink r = Gen(fun seed size ->
-        Tree.unfold id shrink (r seed size)
-    )
+    let create shrink r =
+        Gen(fun seed size ->
+            Tree.unfold id shrink (r seed size))
 
     [<CompiledName("Constant")>]
-    let constant x = Gen(fun _ _ ->
-        Tree.singleton x
-    )
+    let constant x =
+        Gen(fun _ _ ->
+            Tree.singleton x)
 
     [<CompiledName("Bind")>]
-    let bind g k = Gen(fun seed0 size ->
-        let seed1, seed2 =
-            Seed.split seed0
+    let bind g k =
+        Gen(fun seed0 size ->
+            let seed1, seed2 =
+                Seed.split seed0
 
-        Tree.bind (run seed1 size g) (run seed2 size << k)
-    )
+            Tree.bind (run seed1 size g) (run seed2 size << k))
 
     let replicate times g =
         let rec loop n xs =
@@ -69,9 +72,9 @@ module Gen =
         bind gx <| (f >> constant)
 
     [<CompiledName("MapTree")>]
-    let mapTree f g = Gen(fun seed size ->
-        f (unsafeRun seed size g)
-    )
+    let mapTree f g =
+        Gen(fun seed size ->
+            f (unsafeRun seed size g))
 
     [<CompiledName("Map")>]
     let map f g =
@@ -171,9 +174,9 @@ module Gen =
     /// Overrides the size parameter. Returns a generator which uses the
     /// given size instead of the runtime-size parameter.
     [<CompiledName("Resize")>]
-    let resize n g = Gen(fun seed _ ->
-        run seed n g
-    )
+    let resize n g =
+        Gen(fun seed _ ->
+            run seed n g)
 
     /// Adjust the size parameter, by transforming it with the given
     /// function.

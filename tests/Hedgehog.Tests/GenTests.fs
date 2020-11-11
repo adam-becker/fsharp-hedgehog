@@ -21,7 +21,7 @@ let ``dateTime creates System.DateTime instances`` count =
 
 [<Fact>]
 let ``unicode doesn't return any surrogate`` () =
-    let actual = Gen.sample 100 100000 Gen.unicode 
+    let actual = Gen.sample 100 100000 Gen.unicode
     [] =! List.filter System.Char.IsSurrogate actual
 
 [<Theory>]
@@ -40,21 +40,23 @@ let ``dateTime randomly generates value between max and min ticks`` () =
         Range.constant
             System.DateTime.MinValue.Ticks
             System.DateTime.MaxValue.Ticks
-    let ticks =
+
+    let expected =
         Gen.integral range
-        |> Gen.run seed1 0
-    let expected = System.DateTime ticks
+        |> Gen.map System.DateTime
+        |> Gen.extract seed1 0
 
-    let actual = Gen.dateTime (Range.constant System.DateTime.MinValue System.DateTime.MaxValue)
+    let actual =
+        Gen.dateTime
+        |> Gen.extract seed0 0
 
-    let result = actual |> Gen.run seed0 0 |> Tree.outcome
-    expected =! result
+    expected =! actual
 
 [<Fact>]
 let ``dateTime shrinks to correct mid-value`` () =
     let result =
         property {
-            let! actual = 
+            let! actual =
               Range.constantFrom (System.DateTime (2000, 1, 1)) System.DateTime.MinValue System.DateTime.MaxValue
               |> Gen.dateTime
             System.DateTime.Now =! actual
