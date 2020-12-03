@@ -27,38 +27,38 @@ module Gen =
         Gen (fun seed size -> unsafeRun seed size (f()))
 
     [<CompiledName("TryFinally")>]
-    let tryFinally (g : Gen<'a>) (after : unit -> unit) : Gen<'a> =
+    let tryFinally (m : Gen<'a>) (after : unit -> unit) : Gen<'a> =
         Gen(fun seed size ->
             try
-                unsafeRun seed size g
+                unsafeRun seed size m
             finally
                 after ())
 
     [<CompiledName("TryWith")>]
-    let tryWith (g : Gen<'a>) (k : exn -> Gen<'a>) : Gen<'a> =
+    let tryWith (m : Gen<'a>) (k : exn -> Gen<'a>) : Gen<'a> =
         Gen(fun seed size ->
             try
-                unsafeRun seed size g
+                unsafeRun seed size m
             with
                 x -> unsafeRun seed size (k x))
 
     [<CompiledName("Create")>]
-    let create (shrink : 'b -> seq<'b>) (r : Seed -> Size -> 'b) =
+    let create (shrink : 'a -> seq<'a>) (r : Seed -> Size -> 'a) : Gen<'a> =
         Gen(fun seed size ->
             Tree.unfold id shrink (r seed size))
 
     [<CompiledName("Constant")>]
-    let constant (a : 'a) : Gen<'a> =
+    let constant (x : 'a) : Gen<'a> =
         Gen(fun _ _ ->
-            Tree.singleton a)
+            Tree.singleton x)
 
     [<CompiledName("Bind")>]
-    let bind (g : Gen<'a>) (k : 'a -> Gen<'b>) : Gen<'b> =
+    let bind (m0 : Gen<'a>) (k : 'a -> Gen<'b>) : Gen<'b> =
         Gen(fun seed0 size ->
             let seed1, seed2 =
                 Seed.split seed0
 
-            Tree.bind (run seed1 size g) (run seed2 size << k))
+            Tree.bind (run seed1 size m0) (run seed2 size << k))
 
     [<CompiledName("Replicate")>]
     let replicate (times : int) (g : Gen<'a>) : Gen<'a list> =
@@ -70,10 +70,10 @@ module Gen =
         loop times []
 
     [<CompiledName("Apply")>]
-    let apply (gf : Gen<'a -> 'b>) (ga : Gen<'a>) : Gen<'b> =
+    let apply (gf : Gen<'a -> 'b>) (gx : Gen<'a>) : Gen<'b> =
         bind gf <| fun f ->
-        bind ga <| fun a ->
-        constant (f a)
+        bind gx <| fun x ->
+        constant (f x)
 
     [<CompiledName("MapTree")>]
     let mapTree (f : Tree<'a> -> Tree<'b>) (g : Gen<'a>) : Gen<'b> =
@@ -178,7 +178,7 @@ module Gen =
     /// Overrides the size parameter. Returns a generator which uses the
     /// given size instead of the runtime-size parameter.
     [<CompiledName("Resize")>]
-    let resize (n : Size) (g : Gen<'a>) : Gen<'a> =
+    let resize (n : int) (g : Gen<'a>) : Gen<'a> =
         Gen(fun seed _ ->
             run seed n g)
 
@@ -226,7 +226,7 @@ module Gen =
             List.ofSeq xs0
 
         let total =
-            List.sumBy fst xs
+            List.sum (List.map fst xs)
 
         let rec pick n = function
             | [] ->
@@ -272,10 +272,11 @@ module Gen =
     /// More or less the same logic as suchThatMaybe from QuickCheck, except
     /// modified to ensure that the shrinks also obey the predicate.
     let private tryFilterRandom (p : 'a -> bool) (g : Gen<'a>) : Gen<'a option> =
-        let rec tryN k n =
-            if n = 0 then
+        let rec tryN k =
+            function
+            | 0 ->
                 constant None
-            else
+            | n ->
                 let g' = resize (2 * k + n) g
                 bind g' <| fun x ->
                     if p x then
@@ -321,16 +322,11 @@ module Gen =
                 1 + n, map Some g
             ]
 
-    let private atLeast (n : int) (xs : List<'a>) : bool =
-        (List.length xs) >= n
-
     /// Generates a list using a 'Range' to determine the length.
     [<CompiledName("List")>]
-    let list range (g : Gen<'a>) : Gen<'a list> =
-        bind (integral range) <| (fun n ->
-        bind (replicate n g) <| (fun xs ->
-            constant xs
-        ))
+    let list (range : Range<int>) (g : Gen<'a>) : Gen<List<'a>> =
+        bind (integral range) <| fun n ->
+            replicate n g
 
     /// Generates an array using a 'Range' to determine the length.
     let array (range : Range<int>) (g : Gen<'a>) : Gen<array<'a>> =
