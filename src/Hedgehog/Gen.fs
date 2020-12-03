@@ -53,12 +53,12 @@ module Gen =
             Tree.singleton x)
 
     [<CompiledName("Bind")>]
-    let bind (m0 : Gen<'a>) (k : 'a -> Gen<'b>) : Gen<'b> =
+    let bind (m0 : Gen<'a>) (k0 : 'a -> Gen<'b>) : Gen<'b> =
         Gen(fun seed0 size ->
             let seed1, seed2 =
                 Seed.split seed0
 
-            Tree.bind (run seed1 size m0) (run seed2 size << k))
+            Tree.bind (run seed1 size m0) (run seed2 size << k0))
 
     [<CompiledName("Replicate")>]
     let replicate (times : int) (g : Gen<'a>) : Gen<'a list> =
@@ -272,8 +272,7 @@ module Gen =
     /// More or less the same logic as suchThatMaybe from QuickCheck, except
     /// modified to ensure that the shrinks also obey the predicate.
     let private tryFilterRandom (p : 'a -> bool) (g : Gen<'a>) : Gen<'a option> =
-        let rec tryN k =
-            function
+        let rec tryN k = function
             | 0 ->
                 constant None
             | n ->
@@ -347,8 +346,8 @@ module Gen =
     /// Generates a Unicode character, including invalid standalone surrogates:
     /// '\000'..'\65535'
     let unicodeAll : Gen<char> =
-        let lo = Char.MinValue
-        let hi = Char.MaxValue
+        let lo = System.Char.MinValue
+        let hi = System.Char.MaxValue
         char lo hi
 
     // Generates a random digit.
@@ -380,7 +379,7 @@ module Gen =
             || x = Operators.char 65535
         unicodeAll
         |> filter (not << isNoncharacter)
-        |> filter (not << Char.IsSurrogate)
+        |> filter (not << System.Char.IsSurrogate)
 
     // Generates a random alpha character.
     let alpha : Gen<char> =
@@ -462,24 +461,24 @@ module Gen =
 
     /// Generates a random globally unique identifier.
     [<CompiledName("Guid")>]
-    let guid : Gen<Guid> = gen {
+    let guid : Gen<System.Guid> = gen {
         let! bs = array (Range.constant 16 16) (byte <| Range.constantBounded ())
-        return Guid bs
+        return System.Guid bs
     }
 
     /// Generates a random instant in time expressed as a date and time of day.
     [<CompiledName("DateTime")>]
-    let dateTime : Gen<DateTime> =
+    let dateTime : Gen<System.DateTime> =
         let minTicks =
-            DateTime.MinValue.Ticks
+            System.DateTime.MinValue.Ticks
         let maxTicks =
-            DateTime.MaxValue.Ticks
+            System.DateTime.MaxValue.Ticks
         gen {
             let! ticks =
                 Range.constantFrom
-                    (DateTime (2000, 1, 1)).Ticks minTicks maxTicks
+                    (System.DateTime (2000, 1, 1)).Ticks minTicks maxTicks
                 |> integral
-            return DateTime ticks
+            return System.DateTime ticks
         }
 
     //
