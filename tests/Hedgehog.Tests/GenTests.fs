@@ -40,17 +40,15 @@ let ``dateTime randomly generates value between max and min ticks`` () =
         Range.constant
             System.DateTime.MinValue.Ticks
             System.DateTime.MaxValue.Ticks
-
-    let expected =
+    let ticks =
         Gen.integral range
-        |> Gen.map System.DateTime
         |> Gen.extract seed1 0
+    let expected = System.DateTime ticks
 
-    let actual =
-        Gen.dateTime
-        |> Gen.extract seed0 0
+    let actual = Gen.dateTime (Range.constant System.DateTime.MinValue System.DateTime.MaxValue)
 
-    expected =! actual
+    let result = actual |> Gen.run seed0 0 |> Tree.outcome
+    expected =! result
 
 [<Fact>]
 let ``dateTime shrinks to correct mid-value`` () =

@@ -4,29 +4,26 @@ open System
 open Hedgehog.Numeric
 
 /// A generator for values and shrink trees of type 'a.
+[<Struct>]
 type Gen<'a> =
     | Gen of (Seed -> Size -> Tree<'a>)
 
-[<RequireQualifiedAccess>]
 module Gen =
 
     let private unsafeRun (seed : Seed) (size : Size) (Gen(g) : Gen<'a>) : Tree<'a> =
         g seed size
 
-    [<CompiledName("Run")>]
     let run (seed : Seed) (size : Size) (g : Gen<'a>) : Tree<'a> =
         unsafeRun seed (max 1 size) g
 
-    [<CompiledName("Extract")>]
     let extract (seed : Seed) (size : Size) (g : Gen<'a>) : 'a =
         run seed size g
         |> Tree.outcome
 
-    [<CompiledName("Delay")>]
     let delay (f : unit -> Gen<'a>) : Gen<'a> =
-        Gen (fun seed size -> unsafeRun seed size (f()))
+        Gen(fun seed size ->
+            unsafeRun seed size (f()))
 
-    [<CompiledName("TryFinally")>]
     let tryFinally (m : Gen<'a>) (after : unit -> unit) : Gen<'a> =
         Gen(fun seed size ->
             try
@@ -34,7 +31,6 @@ module Gen =
             finally
                 after ())
 
-    [<CompiledName("TryWith")>]
     let tryWith (m : Gen<'a>) (k : exn -> Gen<'a>) : Gen<'a> =
         Gen(fun seed size ->
             try
@@ -42,17 +38,14 @@ module Gen =
             with
                 x -> unsafeRun seed size (k x))
 
-    [<CompiledName("Create")>]
     let create (shrink : 'a -> seq<'a>) (r : Seed -> Size -> 'a) : Gen<'a> =
         Gen(fun seed size ->
             Tree.unfold id shrink (r seed size))
 
-    [<CompiledName("Constant")>]
     let constant (x : 'a) : Gen<'a> =
         Gen(fun _ _ ->
             Tree.singleton x)
 
-    [<CompiledName("Bind")>]
     let bind (m0 : Gen<'a>) (k0 : 'a -> Gen<'b>) : Gen<'b> =
         Gen(fun seed0 size ->
             let seed1, seed2 =
@@ -60,7 +53,6 @@ module Gen =
 
             Tree.bind (run seed1 size m0) (run seed2 size << k0))
 
-    [<CompiledName("Replicate")>]
     let replicate (times : int) (g : Gen<'a>) : Gen<'a list> =
         let rec loop n xs =
             if n <= 0 then
@@ -69,18 +61,14 @@ module Gen =
                 bind g (fun x -> loop (n - 1) (x :: xs))
         loop times []
 
-    [<CompiledName("Apply")>]
     let apply (gf : Gen<'a -> 'b>) (gx : Gen<'a>) : Gen<'b> =
         bind gf <| fun f ->
-        bind gx <| fun x ->
-        constant (f x)
+        bind gx <| (f >> constant)
 
-    [<CompiledName("MapTree")>]
     let mapTree (f : Tree<'a> -> Tree<'b>) (g : Gen<'a>) : Gen<'b> =
         Gen(fun seed size ->
             f (unsafeRun seed size g))
 
-    [<CompiledName("Map")>]
     let map (f : 'a -> 'b) (g : Gen<'a>) : Gen<'b> =
         mapTree (Tree.map f) g
 
@@ -172,12 +160,11 @@ module Gen =
 
     /// Used to construct generators that depend on the size parameter.
     let sized (f : Size -> Gen<'a>) : Gen<'a> =
-        Gen <| fun seed size ->
-            unsafeRun seed size (f size)
+        Gen(fun seed size ->
+            unsafeRun seed size (f size))
 
     /// Overrides the size parameter. Returns a generator which uses the
     /// given size instead of the runtime-size parameter.
-    [<CompiledName("Resize")>]
     let resize (n : int) (g : Gen<'a>) : Gen<'a> =
         Gen(fun seed _ ->
             run seed n g)
@@ -194,11 +181,11 @@ module Gen =
 
     /// Generates a random number in the given inclusive range.
     let inline integral (range : Range<'a>) : Gen<'a> =
-        let integral seed size =
+        let randomIntegral seed size =
             let (lo, hi) = Range.bounds size range
             let x, _ = Seed.nextBigInt (toBigInt lo) (toBigInt hi) seed
             fromBigInt x
-        create (Shrink.towards <| Range.origin range) integral
+        create (Shrink.towards <| Range.origin range) randomIntegral
 
     //
     // Combinators - Choice
@@ -226,7 +213,7 @@ module Gen =
             List.ofSeq xs0
 
         let total =
-            List.sum (List.map fst xs)
+            List.sumBy fst xs
 
         let rec pick n = function
             | [] ->
@@ -269,9 +256,8 @@ module Gen =
     // Combinators - Conditional
     //
 
-    /// More or less the same logic as suchThatMaybe from QuickCheck, except
-    /// modified to ensure that the shrinks also obey the predicate.
-    let private tryFilterRandom (p : 'a -> bool) (g : Gen<'a>) : Gen<'a option> =
+    /// Tries to generate a value that satisfies a predicate.
+    let tryFilter (p : 'a -> bool) (g : Gen<'a>) : Gen<'a option> =
         let rec tryN k = function
             | 0 ->
                 constant None
@@ -288,7 +274,7 @@ module Gen =
     /// Generates a value that satisfies a predicate.
     let filter (p : 'a -> bool) (g : Gen<'a>) : Gen<'a> =
         let rec loop () =
-            bind (tryFilterRandom p g) <| function
+            bind (tryFilter p g) <| function
                 | None ->
                     sized <| fun n ->
                         resize (n + 1) (delay loop)
@@ -296,10 +282,6 @@ module Gen =
                     constant x
 
         loop ()
-
-    /// Tries to generate a value that satisfies a predicate.
-    let tryFilter (p : 'a -> bool) (g : Gen<'a>) : Gen<'a option> =
-        tryFilterRandom p g
 
     /// Runs an option generator until it produces a 'Some'.
     let some (g : Gen<'a option>) : Gen<'a> =
@@ -322,7 +304,6 @@ module Gen =
             ]
 
     /// Generates a list using a 'Range' to determine the length.
-    [<CompiledName("List")>]
     let list (range : Range<int>) (g : Gen<'a>) : Gen<List<'a>> =
         bind (integral range) <| fun n ->
             replicate n g
@@ -346,8 +327,8 @@ module Gen =
     /// Generates a Unicode character, including invalid standalone surrogates:
     /// '\000'..'\65535'
     let unicodeAll : Gen<char> =
-        let lo = System.Char.MinValue
-        let hi = System.Char.MaxValue
+        let lo = Char.MinValue
+        let hi = Char.MaxValue
         char lo hi
 
     // Generates a random digit.
@@ -379,7 +360,7 @@ module Gen =
             || x = Operators.char 65535
         unicodeAll
         |> filter (not << isNoncharacter)
-        |> filter (not << System.Char.IsSurrogate)
+        |> filter (not << Char.IsSurrogate)
 
     // Generates a random alpha character.
     let alpha : Gen<char> =
@@ -460,25 +441,38 @@ module Gen =
     //
 
     /// Generates a random globally unique identifier.
-    [<CompiledName("Guid")>]
-    let guid : Gen<System.Guid> = gen {
+    let guid : Gen<Guid> = gen {
         let! bs = array (Range.constant 16 16) (byte <| Range.constantBounded ())
-        return System.Guid bs
+        return Guid bs
     }
 
-    /// Generates a random instant in time expressed as a date and time of day.
-    [<CompiledName("DateTime")>]
-    let dateTime : Gen<System.DateTime> =
-        let minTicks =
-            System.DateTime.MinValue.Ticks
-        let maxTicks =
-            System.DateTime.MaxValue.Ticks
+    /// Generates a random DateTime using the specified range.
+    /// For example:
+    ///   let range =
+    ///      Range.constantFrom
+    ///          (DateTime (2000, 1, 1)) DateTime.MinValue DateTime.MaxValue
+    ///   Gen.dateTime range
+    let dateTime (range : Range<DateTime>) : Gen<DateTime> =
         gen {
-            let! ticks =
-                Range.constantFrom
-                    (System.DateTime (2000, 1, 1)).Ticks minTicks maxTicks
-                |> integral
-            return System.DateTime ticks
+            let! ticks = range |> Range.map (fun dt -> dt.Ticks) |> integral
+            return DateTime ticks
+        }
+
+    /// Generates a random DateTimeOffset using the specified range.
+    let dateTimeOffset (range : Range<DateTimeOffset>) : Gen<DateTimeOffset> =
+        gen {
+            let! ticks = range |> Range.map (fun dt -> dt.Ticks) |> integral
+            // Ensure there is no overflow near the edges when adding the offset
+            let minOffsetMinutes =
+              max
+                (-14L * 60L)
+                ((DateTimeOffset.MaxValue.Ticks - ticks) / TimeSpan.TicksPerMinute * -1L)
+            let maxOffsetMinutes =
+              min
+                (14L * 60L)
+                ((ticks - DateTimeOffset.MinValue.Ticks) / TimeSpan.TicksPerMinute)
+            let! offsetMinutes = int (Range.linearFrom 0 (Operators.int minOffsetMinutes) (Operators.int maxOffsetMinutes))
+            return DateTimeOffset(ticks, TimeSpan.FromMinutes (Operators.float offsetMinutes))
         }
 
     //
