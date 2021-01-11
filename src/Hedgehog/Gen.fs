@@ -22,7 +22,7 @@ module Gen =
 
     let delay (f : unit -> Gen<'a>) : Gen<'a> =
         Gen(fun seed size ->
-            unsafeRun seed size (f()))
+            unsafeRun seed size (f ()))
 
     let tryFinally (m : Gen<'a>) (after : unit -> unit) : Gen<'a> =
         Gen(fun seed size ->
@@ -265,7 +265,7 @@ module Gen =
                 let g' = resize (2 * k + n) g
                 bind g' <| fun x ->
                     if p x then
-                        constant(Some(x))
+                        constant (Some x)
                     else
                         tryN (k + 1) (n - 1)
 

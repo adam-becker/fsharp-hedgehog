@@ -17,7 +17,7 @@ type Gen private () =
         Gen.delay func.Invoke
 
     static member Create (shrink : Func<'T, seq<'T>>, random : Func<Seed, Size, 'T>) : Gen<'T> =
-        Gen.create shrink.Invoke (fun seed size -> random.Invoke(seed, size))
+        Gen.create shrink.Invoke (fun seed size -> random.Invoke (seed, size))
 
     static member Sized (scaler : Func<Size, Gen<'T>>) : Gen<'T> =
         Gen.sized scaler.Invoke
