@@ -484,8 +484,10 @@ module Gen =
             let (seed1, seed2) = Seed.split seed
             (run seed1 size g), seed2
 
+        let seed = Seed.random ()
+
         Seq.init count id
-        |> Seq.mapFold action (Seed.random ())
+        |> Seq.mapFold action seed
         |> fst
         |> Seq.toList
 
