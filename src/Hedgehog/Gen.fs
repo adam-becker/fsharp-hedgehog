@@ -10,7 +10,7 @@ type Gen<'a> =
 
 module Gen =
 
-    let private unsafeRun (seed : Seed) (size : Size) (Gen(g) : Gen<'a>) : Tree<'a> =
+    let private unsafeRun (seed : Seed) (size : Size) (Gen g : Gen<'a>) : Tree<'a> =
         g seed size
 
     let run (seed : Seed) (size : Size) (g : Gen<'a>) : Tree<'a> =
@@ -21,33 +21,33 @@ module Gen =
         |> Tree.outcome
 
     let delay (f : unit -> Gen<'a>) : Gen<'a> =
-        Gen(fun seed size ->
+        Gen (fun seed size ->
             unsafeRun seed size (f ()))
 
     let tryFinally (m : Gen<'a>) (after : unit -> unit) : Gen<'a> =
-        Gen(fun seed size ->
+        Gen (fun seed size ->
             try
                 unsafeRun seed size m
             finally
                 after ())
 
     let tryWith (m : Gen<'a>) (k : exn -> Gen<'a>) : Gen<'a> =
-        Gen(fun seed size ->
+        Gen (fun seed size ->
             try
                 unsafeRun seed size m
             with
                 x -> unsafeRun seed size (k x))
 
     let create (shrink : 'a -> seq<'a>) (r : Seed -> Size -> 'a) : Gen<'a> =
-        Gen(fun seed size ->
+        Gen (fun seed size ->
             Tree.unfold id shrink (r seed size))
 
     let constant (x : 'a) : Gen<'a> =
-        Gen(fun _ _ ->
+        Gen (fun _ _ ->
             Tree.singleton x)
 
     let bind (m0 : Gen<'a>) (k0 : 'a -> Gen<'b>) : Gen<'b> =
-        Gen(fun seed0 size ->
+        Gen (fun seed0 size ->
             let seed1, seed2 =
                 Seed.split seed0
 
@@ -66,7 +66,7 @@ module Gen =
         bind gx <| (f >> constant)
 
     let mapTree (f : Tree<'a> -> Tree<'b>) (g : Gen<'a>) : Gen<'b> =
-        Gen(fun seed size ->
+        Gen (fun seed size ->
             f (unsafeRun seed size g))
 
     let map (f : 'a -> 'b) (g : Gen<'a>) : Gen<'b> =
@@ -160,13 +160,13 @@ module Gen =
 
     /// Used to construct generators that depend on the size parameter.
     let sized (f : Size -> Gen<'a>) : Gen<'a> =
-        Gen(fun seed size ->
+        Gen (fun seed size ->
             unsafeRun seed size (f size))
 
     /// Overrides the size parameter. Returns a generator which uses the
     /// given size instead of the runtime-size parameter.
     let resize (n : int) (g : Gen<'a>) : Gen<'a> =
-        Gen(fun seed _ ->
+        Gen (fun seed _ ->
             run seed n g)
 
     /// Adjust the size parameter, by transforming it with the given
