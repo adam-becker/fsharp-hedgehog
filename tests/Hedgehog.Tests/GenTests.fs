@@ -42,7 +42,8 @@ let ``dateTime randomly generates value between max and min ticks`` () =
             System.DateTime.MaxValue.Ticks
     let ticks =
         Gen.integral range
-        |> Gen.extract seed1 0
+        |> Gen.run seed1 0
+        |> Tree.outcome
     let expected = System.DateTime ticks
 
     let actual = Gen.dateTime (Range.constant System.DateTime.MinValue System.DateTime.MaxValue)

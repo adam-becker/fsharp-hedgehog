@@ -1,4 +1,4 @@
-﻿namespace Hedgehog
+namespace Hedgehog
 
 open System
 open Hedgehog.Numeric
@@ -15,10 +15,6 @@ module Gen =
 
     let run (seed : Seed) (size : Size) (g : Gen<'a>) : Tree<'a> =
         unsafeRun seed (max 1 size) g
-
-    let extract (seed : Seed) (size : Size) (g : Gen<'a>) : 'a =
-        run seed size g
-        |> Tree.outcome
 
     let delay (f : unit -> Gen<'a>) : Gen<'a> =
         Gen (fun seed size ->
